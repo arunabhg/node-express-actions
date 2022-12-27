@@ -9,15 +9,15 @@ on:
 env:
   BUCKET_NAME: "node-express-actions-artifact"
   AWS_REGION: "ap-south-1"
-#permission can be added at job level or workflow level
-permissions:
-  id_token: write
-  contents: read #required for actions/checkout
+  GITHUB_REF: "main"
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    #permission can be added at job level or workflow level
+    permissions:
+      id_token: write
+      contents: read #required for actions/checkout
     steps:
       - uses: actions/checkout@v3
 
