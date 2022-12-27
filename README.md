@@ -35,7 +35,7 @@
 
     ```
 
-Here the \* after the repo name means the repo can be accessed by all refs and not only main.
+_Here the \* after the repo name means the repo can be accessed by all refs and not only main._
 
 10. Go to the YAML file in your GitHub Workflows.<br />
     10.1 Add an env section with the bucket name, region & permissions.<br />
@@ -50,42 +50,42 @@ GITHUB_REF: "main"`<br>
     Put this before the steps part. <br />
     10.3 Add a section to configure the AWS credentials as the first step - <br />
 
-            ```
-                - name: Configure AWS Credentials
-                    uses: aws-actions/configure-aws-credentials@v1
-                    with:
-                      role-to-assume: arn:aws:iam::754345194439:role/GitHub-actions-role
-                      role-session-name: Github-Actions-Role
-                      aws-region: ${{ env.AWS_REGION }}
-            ```
+     ```
+        - name: Configure AWS Credentials
+            uses: aws-actions/configure-aws-credentials@v1
+            with:
+              role-to-assume: arn:aws:iam::754345194439:role/GitHub-actions-role
+              role-session-name: Github-Actions-Role
+              aws-region: ${{ env.AWS_REGION }}
+    ```
 
-            _Note -_ Remember to change the arn and role-session-name as specified in the IAM Role, otherwise the Action will fail.<br />
-            10.4 Add a step to create a SHA hash. Add this section below the just below above one.<br />
+    _Note -_ Remember to change the arn and role-session-name as specified in the IAM Role, otherwise the Action will fail.<br />
+    10.4 Add a step to create a SHA hash. Add this section below the just below above one.<br />
 
-            ```
-                - name: Extract branch name
-                shell: bash
-                run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-                id: extract_branch
-                - name: Extract commit hash
-                shell: bash
-                run: echo "##[set-output name=commit_hash;]$(echo "$GITHUB_SHA")"
-                id: extract_hash
-            ```
+    ```
+        - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+        - name: Extract commit hash
+        shell: bash
+        run: echo "##[set-output name=commit_hash;]$(echo "$GITHUB_SHA")"
+        id: extract_hash
+    ```
 
-            10.5 As a last step in the workflow, make a directory in S3 and upload the artifact as a zip file to the folder in S3.
-            Add the last step at the end of the workflow - <br />
+    10.5 As a last step in the workflow, make a directory in S3 and upload the artifact as a zip file to the folder in S3.
+    Add the last step at the end of the workflow - <br />
 
-            ```
-                - name: Make Artifact directory
-                run: mkdir -p ./artifacts
+    ```
+        - name: Make Artifact directory
+        run: mkdir -p ./artifacts
 
-                # Copy build directory to S3
-                - name: Copy build to S3
-                run: |
-                    zip -r ./artifacts/project.zip . -x node_modules/**\* .git/**\* dist/**\* dist/**\*
-                    aws s3 sync  ${GITHUB_WORKSPACE}/artifacts s3://${{ env.BUCKET_NAME }}/${{ steps.extract_branch.outputs.branch }}/latest
-            ```
+        # Copy build directory to S3
+        - name: Copy build to S3
+        run: |
+            zip -r ./artifacts/project.zip . -x node_modules/**\* .git/**\* dist/**\* dist/**\*
+            aws s3 sync  ${GITHUB_WORKSPACE}/artifacts s3://${{ env.BUCKET_NAME }}/${{ steps.extract_branch.outputs.branch }}/latest
+    ```
 
 ---
 
