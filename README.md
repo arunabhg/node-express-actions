@@ -1,65 +1,88 @@
-# Node.js Express app deploy to AWS EC2 using S3 artifact - starter template
+# Node.js Express CI to AWS S3 artifact using GitHub Actions OIDC - starter template
 
 ### Steps
 
 1.  Create a new repo or clone this repo.
     <br /><br />
-2.  Set up AWS EC2.<br />
-    2.1 Open a new EC2 instance and create a new Key pair. Copy to the home directory.<br />
-    2.2 Go to the Security Groups. Create a new Security Group. Add ports `22 for SSH` and `3000 for Custom TCP` in _Inbound Rules_. They should be open for **Anywhere/IPV4 (0.0.0.0)**.<br /><br />
-3.  Create a role with **S3 full access** and **Admin access**.<br /><br />
-4.  If not already created, add a new IAM user and grant it the above role. Give it _programmatic_ access so that it can access via AWS CLI. _(No login via IAM/password is required)_<br /><br />
-5.  Open AWS S3 and create a bucket with a name you want to save your files in. For eg., _node-express-typescript-artifact_.<br /><br />
-6.  Open a command prompt (Administrator) and configure AWS CLI for the IAM user. (give command - `aws configure` in the command prompt and enter _access key_, _secret key_ and _region_ for the IAM user using the AWS console).<br />
-    To install AWS CLI - https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html<br /><br />
-7.  If on **Windows**, use a tool like WinRar or 7Zip to create a project.zip file containing all the project folders except the _node_modules_, _dist_ and _.github_. On **MacOS** or **Linux**, use the command line to create a zip of the project file - `zip -r project.zip . -x node_modules* dist* .git*` <br />
-    _**Note -**_ Remember to NOT include the parent folder while creating the archive.<br /><br />
-8.  Upload the zip file to S3 using the command - `aws s3 cp project.zip s3://<S3_bucket_name>/<folder_name>/project.zip`. <br />
-    _**Note -**_ Remember to change the S3 bucket name and the underlying folder with the name and folder you have created the S3 bucket. For eg., `aws s3 cp project.zip s3://node-express-typescript-artifact/code-deploy-1/project.zip`.<br /><br />
-9.  Create the EC2 instance and choose key pair and security group.<br /><br />
-10. SSH into the instance using a SSH tool like Putty on Windows. On MacOS or Linux, you can use the terminal.<br />
-    _**Note -**_ If you get an error like 'server refused our key' give appropriate user name for the AMI. If chosen **Ubuntu** AMI, the username will be `ubuntu` and for **AWS Linux** will be `ec2-user`. For the full troubleshooting tips for Putty - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/TroubleshootingInstancesConnecting.html#TroubleshootingInstancesConnectingPuTTY<br /><br />
-11. After logging into the server with the help of Putty, create a directory in it to put the files in.<br /><br />
-12. Install and _configure_ AWS CLI in the instance _(inside server)_ as per the instance configuration.<br /><br />
-13. Copy the project files in S3 bucket where we have stored our zip files to our EC2 instance using SSH. Use the URI mentioned in the S3 bucket to copy.<br /> _**Note -**_ Create an _EC2 role_ with S3 access first, and add the role to the instance. (You will need to modify the IAM role by clicking on the Actions of the EC2 instance. This will grant the EC2 instance access to S3.)<br /><br />
-14. Unzip the zipped file copied from S3 bucket to the folder created.<br /> Command - `unzip -o project.zip -d Code/node-express-codedeploy1/`<br /><br />
-15. Install Node.js in the server.<br /><br />
-16. Run `npm run build`, if it's a TypeScript project and `npm run start`, if a node express one. Grab the IP from the EC2 instance and check on port 3000. You should have the same output as the local. Your backend Node.js is successfully deployed on EC2.<br /><br />
-17. Add a systemd service on the server so that we don't always have to run the server manually. <br />The command - `sudo vim /etc/systemd/system/node-api.service`<br />
-    17.1 Add the following code snippet and terminate with :wq! -<br />
+2.  We don't need to create a GitHub Secret or an IAM User to upload artifacts to S3 bucket. All we need is to create a role with the specific access. _Refer_ - [AWS-Actions - Configure AWS Credentials](https://github.com/aws-actions/configure-aws-credentials)<br /><br />
+3.  Using **OpenID Connect (OIDC)** we can adopt the following practices:<br />
+    3.1 No need to configure long-lived GitHub cloud secrets.<br />
+    3.2 We have more granular control over how workflows can use credentials.<br />
+    3.3 Using OIDC, the cloud provider (AWS, Azure, GCP), issues a short-lived access-token that is only valid for a single job, and then automatically expires. <br />
+    _Refer_ - [Overview of OpenId Connect](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)<br /><br />
+4.  Go to AWS console -> IAM -> Identity Providers & click on **Add Provider**. <br /><br />
+5.  Select OpenID Connect and for the provider URL: `https://token.actions.githubusercontent.com`<br /><br />
+6.  Click on **Get Thumbprint**.<br /><br />
+7.  For the audience, use: `sts.amazonaws.com` and add the provider.<br /><br />
+8.  Click on Assign Role -> Create a new role. <br />
+    8.1 AWS creates an identity type of **Web Identity** with audience of `sts.amazonaws.com`. Click **Next: Permissions**<br />
+    8.2 You can give S3FullAccess. **_Note -_** Permissions (List, Read, Write) should be for the specific buckets, not full access in production.<br />
+    8.3 Give the role a name, eg., _Github-actions-role_, add description, and click on **Create Role**.<br /><br />
+9.  Go to the trust relationship of the role and click Edit Trust Policy.<br />
+    Add the line to it: `"token.actions.githubusercontent.com:sub": "repo:octo-org/octo-repo:ref:refs/heads/octo-branch"`<br />
+    Change the repo owner, name & branch as it applies & Click on **Update Policy**.<br /> For eg., in our case, the string will be - `"token.actions.githubusercontent.com:sub": "repo:arunabhg/node-express-actions:ref:refs/heads/main"`<br />
+    **_Note-_** In some cases we may get error `Error: Not authorized to perform sts:AssumeRoleWithWebIdentity`. In That case we have to Edit the Policy & write the policy as:<br />
+
+    ```
+    "Condition": {
+                "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                },
+                "StringLike": {
+                    "token.actions.githubusercontent.com:sub": "repo:arunabhg/node-express-actions:*"
+                }
+            }
+
+    ```
+
+Here the \* after the repo name means the repo can be accessed by all refs.
+
+10. Go to the YAML file in your GitHub Workflows.<br />
+    10.1 Add an env section with the bucket name, region & permissions.<br />
+    `env:
+  BUCKET_NAME: "<aws-bucket-name>"
+  AWS_REGION: "<aws-region>"
+  GITHUB_REF: "main"`<br>
+    10.2 Add a permissions section in the jobs part which lists the read and write permissions: <br />
+    `  permissions:
+      id-token: write
+      contents: read #required for actions/checkout` <br />
+    Put this before the steps part. <br />
+    10.3 Add a section to configure the AWS credentials as the first step - <br />
 
         ```
-             [Unit]
-             Description=Nodejs Hello world App
-             Documentation=https://example.com
-             After=network.target
-
-             [Service]
-             Type=simple
-             User=ubuntu
-             ExecStart=/usr/bin/node /home/ubuntu/Code/node-express-codedeploy1/dist/index.js
-             Restart=on-failure
-
-             [Install]
-             WantedBy=multi-user.target
+        - name: Configure AWS Credentials
+            uses: aws-actions/configure-aws-credentials@v1
+            with:
+              role-to-assume: arn:aws:iam::754345194439:role/GitHub-actions-role
+              role-session-name: Github-Actions-Role
+              aws-region: ${{ env.AWS_REGION }}
         ```
 
-    17.2 Reload the service - `sudo systemctl daemon-reload`<br />
-    17.3 Enable the service - `sudo systemctl enable node-api.service`<br />
-    17.4 Start the service - `sudo systemctl start node-api.service`<br />
-    17.5 View the service journal - `sudo journalctl -fu node-api.service`<br />
-    After you give all the above commands you will see that your app is running on server and you don't have to start it every time.
+        _Note -_ Remember to change the arn and role-session-name as specified in the IAM Role, otherwise the Action will fail.<br />
+        10.4 Add a step to create a SHA hash. Add this section below the just below above one.
+        ```
+            - name: Extract branch name
+            shell: bash
+            run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+            id: extract_branch
+          - name: Extract commit hash
+            shell: bash
+            run: echo "##[set-output name=commit_hash;]$(echo "$GITHUB_SHA")"
+            id: extract_hash
+        ```
+        10.5 As a last step in the workflow, make a directory in S3 and upload the artifact as a zip file to the folder in S3.
+        Add the last step at the end of the workflow -
+        ```
+            - name: Make Artifact directory
+            run: mkdir -p ./artifacts
 
-## When you make any changes in code on local, run the following commands to upload, build and propagate the changes on the server
+          # Copy build directory to S3
+          - name: Copy build to S3
+            run: |
+              zip -r ./artifacts/project.zip . -x node_modules/**\* .git/**\* dist/**\* dist/**\*
+              aws s3 sync  ${GITHUB_WORKSPACE}/artifacts s3://${{ env.BUCKET_NAME }}/${{ steps.extract_branch.outputs.branch }}/latest
+        ```
 
-## In the local terminal -
-
-Follow Steps 7 & 8 to create & upload a new zip to S3 bucket.
-
-## In the server -
-
-`aws s3 cp s3://node-express-typescript-artifact/code-deploy-1/project.zip project.zip unzip -o project.zip -d Code/node-express-codedeploy1/ npm install --prefix Code/node-express-codedeploy1/ npm run build --prefix Code/node-express-codedeploy1/ sudo systemctl restart node-api.service`
-
----
-
-**_Note -_** This template doesn't use CI/CD to deploy code to EC2. We have to run a command manually using Putty or any other SSH client, each time we make some changes, to push those changes to the server.
+    <br />
+    **_Note -_** Whenever we make any changes to the code, it is automatically pushed to S3 with the help of OIDC using GitHub Action's CI pipeline.
