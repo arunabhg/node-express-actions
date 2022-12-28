@@ -1,5 +1,9 @@
 # Node.js Express CI to AWS S3 artifact using GitHub Actions OIDC - starter template
 
+<br />
+
+***TLDR*:*** Using the below steps, whenever we make any changes to the code, it is automatically pushed to S3 with the help of OIDC (Open ID Connect) using GitHub Action's CI pipeline. Using OIDC, the connection between AWS and GitHub Actions exists for a short duration (min 1 hr) which can be extended.
+
 ### Steps
 
 1.  Create a new repo or clone this repo.
@@ -89,4 +93,4 @@ GITHUB_REF: "main"`<br>
 
 ---
 
-**_Note -_** Whenever we make any changes to the code, it is automatically pushed to S3 with the help of OIDC using GitHub Action's CI pipeline.
+***Note -*** Remember to give the correct names to your S3 bucket, folder, session, role-session, aws-region, etc. in the workflow, otherwise the workflow will fail.
