@@ -2,7 +2,7 @@
 
 <br />
 
-***TLDR*:*** Using the below steps, whenever we make any changes to the code, it is automatically pushed to S3 with the help of OIDC (Open ID Connect) using GitHub Action's CI pipeline. Using OIDC, the connection between AWS and GitHub Actions exists for a short duration (min 1 hr) which can be extended.
+***TLDR*:*** Using the below steps, whenever we make any changes to the code, it is automatically pushed to S3 with the help of OIDC (Open ID Connect) using GitHub Action's CI pipeline. We don't using any Secrets in GitHub Actions. Using OIDC, the connection between AWS and GitHub Actions exists for a short duration (min 1 hr) which can be extended.
 
 ### Steps
 
@@ -41,7 +41,7 @@
 
 _Here the \* after the repo name means the repo can be accessed by all refs and not only main._
 
-10. Go to the YAML file in your GitHub Workflows.<br />
+10. Go to the YAML file in your project's GitHub Workflows.<br />
     10.1 Add an env section with the bucket name, region & permissions.<br />
     `env:
 BUCKET_NAME: "<aws-bucket-name>"
@@ -64,7 +64,7 @@ GITHUB_REF: "main"`<br>
     ```
 
     _Note -_ Remember to change the arn and role-session-name as specified in the IAM Role, otherwise the Action will fail.<br />
-    10.4 Add a step to create a SHA hash. Add this section below the just below above one.<br />
+    10.4 Add a step to create a SHA hash. Add this section just below the above one.<br />
 
     ```
         - name: Extract branch name
